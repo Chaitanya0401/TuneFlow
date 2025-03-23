@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="dashboard">
+    <h2>Welcome, {{ username }}</h2>
+
+    <div class="subscription-area">
+        <h3>Your Subscribed Songs</h3>
+        {% if subscribed_music %}
+            <ul>
+                {% for song in subscribed_music %}
+                    <li>
+                        <img src="{{ song.image_url }}" alt="Artist Image">
+                        <p><strong>{{ song.title }}</strong> by {{ song.artist }}</p>
+                        <p>Album: {{ song.album }} ({{ song.year }})</p>
+                        <form action="{{ url_for('unsubscribe') }}" method="POST">
+                            <input type="hidden" name="song_id" value="{{ song.title }}">
+                            <button type="submit" class="remove-btn">Remove</button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No subscriptions yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="query-area">
+        <h3>Find Songs</h3>
+        <form action="{{ url_for('query') }}" method="POST">
+            <input type="text" name="title" placeholder="Title">
+            <input type="text" name="artist" placeholder="Artist">
+            <input type="text" name="album" placeholder="Album">
+            <input type="text" name="year" placeholder="Year">
+            <button type="submit">Search</button>
+        </form>
+    </div>
+
+    <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+</div>
+{% endblock %}
