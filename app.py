@@ -1,11 +1,20 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import json
 import os
+import boto3
+
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Change this for production
+app.secret_key = "cc-lab1"
 
-import json
+
+# Initialize DynamoDB client
+dynamodb = boto3.resource("dynamodb", region_name="us-east-1")  # Change region as needed
+
+# Reference the login table and music table
+login_table = dynamodb.Table("Login")  # Your table name
+music_table = dynamodb.Table("music")
+
 
 # Load song data from JSON
 with open("data/2025a1.json", "r") as file:
@@ -38,18 +47,33 @@ subscriptions = {}
 def home():
     return redirect(url_for("login"))
 
+from flask import Flask, render_template, request, redirect, url_for, session
+
+
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
-        if email in users and users[email]["password"] == password:
-            session["email"] = email
-            session["username"] = users[email]["username"]
-            return redirect(url_for("main_page"))
+
+        # Query DynamoDB
+        response = login_table.get_item(Key={"email": email})
+        user = response.get("Item")
+
+        if user and user["password"] == password:
+            session["username"] = user["username"]  # Store username in session
+            
+            print("✅ Login successful! Redirecting to main page...")  # Debug
+            print("Session Data:", session)  # Print session
+            
+            return redirect(url_for("main_page"))  # Redirect to main page
         else:
-            flash("Email or password is invalid", "danger")
+            return render_template("login.html", error="Email or password is invalid")
+
     return render_template("login.html")
+
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -57,44 +81,30 @@ def register():
         email = request.form["email"]
         username = request.form["username"]
         password = request.form["password"]
+
+        # Check if user already exists
+        response = login_table.get_item(Key={"email": email})
+        if "Item" in response:
+            return render_template("register.html", error="The email already exists")
+
+        # Add new user to DynamoDB
+        login_table.put_item(Item={"email": email, "username": username, "password": password})
         
-        if email in users:
-            flash("The email already exists", "danger")
-        else:
-            users[email] = {"username": username, "password": password}
-            flash("Registration successful. Please login.", "success")
-            return redirect(url_for("login"))
-    
+        return redirect(url_for("login"))
+
     return render_template("register.html")
 
-@app.route("/main", methods=["GET", "POST"])
+
+@app.route("/main", methods=["GET"])
 def main_page():
-    if "email" not in session:
+    if "username" not in session:
         return redirect(url_for("login"))
-    
-    user_email = session["email"]
-    user_subs = subscriptions.get(user_email, [])
-    
-    if request.method == "POST":
-        search_title = request.form.get("title")
-        search_artist = request.form.get("artist")
-        search_year = request.form.get("year")
-        search_album = request.form.get("album")
-        
-        results = [
-            song for song in music_db 
-            if (not search_title or search_title.lower() in song["title"].lower()) and
-               (not search_artist or search_artist.lower() in song["artist"].lower()) and
-               (not search_year or search_year == song["year"]) and
-               (not search_album or search_album.lower() in song["album"].lower())
-        ]
-        
-        if not results:
-            flash("No result is retrieved. Please query again", "warning")
-    
-        return render_template("main.html", username=session["username"], user_subs=user_subs, search_results=results)
-    
-    return render_template("main.html", username=session["username"], user_subs=user_subs, search_results=[])
+
+    # Fetch all music data from DynamoDB
+    response = music_table.scan()
+    all_songs = response.get("Items", [])
+
+    return render_template("main.html", username=session["username"], songs=all_songs)
 
 @app.route("/subscribe/<title>")
 def subscribe(title):
@@ -129,27 +139,52 @@ def logout():
 
 @app.route("/query", methods=["POST"])
 def query():
-    if "username" not in session:
-        return redirect(url_for("login"))
+    title = request.form.get("title", "").strip()
+    artist = request.form.get("artist", "").strip()
+    yr = request.form.get("year", "").strip()
+    album = request.form.get("album", "").strip()
 
-    # Dummy user subscriptions (replace with actual DynamoDB query later)
-    user_subs = session.get("user_subs", [])  # Retrieve user subscriptions from session
+    # Build filter conditions
+    filter_expression = []
+    expression_values = {}
+    expression_names = {}  # Needed for reserved keywords like "year"
 
-    title = request.form.get("title", "").strip().lower()
-    artist = request.form.get("artist", "").strip().lower()
-    album = request.form.get("album", "").strip().lower()
-    year = request.form.get("year", "").strip()
+    if title:
+        filter_expression.append("title = :title")
+        expression_values[":title"] = title
+    if artist:
+        filter_expression.append("artist = :artist")
+        expression_values[":artist"] = artist
+    if yr:
+        filter_expression.append("#yr = :year")  # Use alias #yr instead of "year"
+        expression_values[":year"] = int(yr)
+        print("input year:", yr)  # Debug
+        expression_names["#yr"] = "year"
+    if album:
+        filter_expression.append("album = :album")
+        expression_values[":album"] = album
 
-    # Filter songs based on query parameters
-    filtered_songs = []
-    for song in songs_data:  # Now this will be defined
-        if (not title or title in song["title"].lower()) and \
-           (not artist or artist in song["artist"].lower()) and \
-           (not album or album in song["album"].lower()) and \
-           (not year or year == song["year"]):
-            filtered_songs.append(song)
+    # Construct the filter expression
+    if filter_expression:
+        filter_string = " AND ".join(filter_expression)
+        scan_params = {
+            "FilterExpression": filter_string,
+            "ExpressionAttributeValues": expression_values,
+        }
+        
+        # Include ExpressionAttributeNames if "year" was used
+        if expression_names:
+            scan_params["ExpressionAttributeNames"] = expression_names
+            print("ExpressionAttributeNames:", scan_params["ExpressionAttributeNames"])  # Debug
 
-    return render_template("main.html", username=session["username"], user_subs=user_subs, search_results=filtered_songs)
+        response = music_table.scan(**scan_params)
+        search_results = response.get("Items", [])
+    else:
+        search_results = []
+
+
+    return render_template("main.html", search_results=search_results, username=session["username"])
+
 
 
 if __name__ == "__main__":
