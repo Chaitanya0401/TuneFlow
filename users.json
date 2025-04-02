@@ -1,0 +1,54 @@
+{
+    "users": [
+      {
+        "email": "s31234560@student.rmit.edu.au",
+        "user_name": "AliceSmith0",
+        "password": "012345"
+      },
+      {
+        "email": "s31234561@student.rmit.edu.au",
+        "user_name": "BobJohnson1",
+        "password": "123456"
+      },
+      {
+        "email": "s31234562@student.rmit.edu.au",
+        "user_name": "CharlieBrown2",
+        "password": "234567"
+      },
+      {
+        "email": "s31234563@student.rmit.edu.au",
+        "user_name": "DavidWilliams3",
+        "password": "345678"
+      },
+      {
+        "email": "s31234564@student.rmit.edu.au",
+        "user_name": "EmmaJones4",
+        "password": "456789"
+      },
+      {
+        "email": "s31234565@student.rmit.edu.au",
+        "user_name": "FrankMiller5",
+        "password": "567890"
+      },
+      {
+        "email": "s31234566@student.rmit.edu.au",
+        "user_name": "GraceDavis6",
+        "password": "678901"
+      },
+      {
+        "email": "s31234567@student.rmit.edu.au",
+        "user_name": "HenryWilson7",
+        "password": "789012"
+      },
+      {
+        "email": "s31234568@student.rmit.edu.au",
+        "user_name": "IslaMoore8",
+        "password": "890123"
+      },
+      {
+        "email": "s31234569@student.rmit.edu.au",
+        "user_name": "JackTaylor9",
+        "password": "901234"
+      }
+    ]
+  }
