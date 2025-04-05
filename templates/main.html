@@ -34,7 +34,29 @@
             <input type="text" name="year" placeholder="Year">
             <button type="submit">Search</button>
         </form>
+
+        {% if search_results %}
+        <div class="search-results">
+            <h3>Search Results</h3>
+            <ul>
+                {% for song in search_results %}
+                    <li>
+                        <img src="{{ song.image_url }}" alt="Artist Image">
+                        <p><strong>{{ song.title }}</strong> by {{ song.artist }}</p>
+                        <p>Album: {{ song.album }} ({{ song.year }})</p>
+                        <form action="{{ url_for('subscribe', title=song.title) }}" method="POST">
+                            <button type="submit" class="subscribe-btn">Subscribe</button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
     </div>
+
+
+
+
 
     <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
 </div>
