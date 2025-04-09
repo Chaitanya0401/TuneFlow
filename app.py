@@ -13,6 +13,13 @@ login_table = dynamodb.Table("login")
 music_table = dynamodb.Table("music")
 subscriptions_table = dynamodb.Table("Subscriptions")  # New subscriptions table
 
+S3_BUCKET = "s4019263-ass1"
+
+def get_s3_image_url(filename):
+    print(f"https://{S3_BUCKET}.s3.amazonaws.com/{filename}")  # Debugging line
+    return f"https://{S3_BUCKET}.s3.amazonaws.com/{filename}"
+
+
 # Load music data (backup/fallback)
 with open("data/2025a1.json", "r") as file:
     music_db = json.load(file)["songs"]
@@ -34,7 +41,7 @@ def login():
 
         if user and user["password"] == password:
             session["email"] = user["email"]
-            session["username"] = user["user_name"]
+            session["user_name"] = user["user_name"]
             return redirect(url_for("main_page"))
         else:
             return render_template("login.html", error="Email or password is invalid")
@@ -53,7 +60,7 @@ def register():
         if "Item" in response:
             return render_template("register.html", error="The email already exists")
 
-        login_table.put_item(Item={"email": email, "username": username, "password": password})
+        login_table.put_item(Item={"email": email, "user_name": username, "password": password})
         return redirect(url_for("login"))
 
     return render_template("register.html")
@@ -63,7 +70,7 @@ from boto3.dynamodb.conditions import Key
 
 @app.route("/main", methods=["GET"])
 def main_page():
-    if "username" not in session or "email" not in session:
+    if "user_name" not in session or "email" not in session:
         return redirect(url_for("login"))
 
     # Fetch all music data (optional — used for search)
@@ -79,7 +86,7 @@ def main_page():
 
     return render_template(
         "main.html",
-        username=session["username"],
+        username=session["user_name"],
         songs=all_songs,
         subscribed_music=user_subs  
     )
@@ -99,7 +106,13 @@ def subscribe(title, artist):
             KeyConditionExpression=boto3.dynamodb.conditions.Key("email").eq(user_email),
             FilterExpression=boto3.dynamodb.conditions.Attr("title").eq(title) & boto3.dynamodb.conditions.Attr("artist").eq(artist)
         )
+
         if not response.get("Items"):  # Only subscribe if not already subscribed
+            # Generate S3 image URL
+            image_filename = song.get("img_url", "").split("/")[-1]
+            print(f"Image filename: {image_filename}")  # Debugging line
+            image_url = get_s3_image_url(image_filename)
+
             subscriptions_table.put_item(Item={
                 "subscription_id": str(uuid.uuid4()),
                 "email": user_email,
@@ -107,7 +120,7 @@ def subscribe(title, artist):
                 "artist": artist,
                 "album": song["album"],
                 "year": song["year"],
-                "image_url": song.get("image_url", "")
+                "image_url": image_url
             })
             print(f"Subscription added for {user_email} to song: {title} by {artist}")  # Debugging line
 
@@ -137,6 +150,9 @@ def unsubscribe():
 
 @app.route("/query", methods=["POST"])
 def query():
+    if "email" not in session:
+        return redirect(url_for("login"))
+
     title = request.form.get("title", "").strip()
     artist = request.form.get("artist", "").strip()
     yr = request.form.get("year", "").strip()
@@ -160,12 +176,12 @@ def query():
         filter_expression.append("album = :album")
         expression_values[":album"] = album
 
+    # Query music table
     if filter_expression:
         scan_params = {
             "FilterExpression": " AND ".join(filter_expression),
             "ExpressionAttributeValues": expression_values
         }
-
         if expression_names:
             scan_params["ExpressionAttributeNames"] = expression_names
 
@@ -174,9 +190,27 @@ def query():
     else:
         search_results = []
 
-    return render_template("main.html", username=session["username"],
-                           songs=[],  # Only show search results
-                           subscribed_music=[],
+    # Add S3 image URL for each song in search results
+    for song in search_results:
+        print(f"Search result song: {song}")
+        image_filename = song.get("img_url", "").split("/")[-1]
+        song["image_url"] = get_s3_image_url(image_filename)
+
+    # ✅ Fetch user's subscribed songs from DynamoDB
+    user_email = session["email"]
+    subscribed_response = subscriptions_table.query(
+        KeyConditionExpression=boto3.dynamodb.conditions.Key("email").eq(user_email)
+    )
+    subscribed_music = subscribed_response.get("Items", [])
+
+    # Add S3 image URL for each subscribed song
+    print(f"Subscribed music: {subscribed_music}")  # Debugging line
+    print(f"Search results: {search_results}")  # Debugging line
+
+    return render_template("main.html",
+                           username=session["user_name"],
+                           songs=[],  # this might be legacy — ignore or repurpose
+                           subscribed_music=subscribed_music,
                            search_results=search_results)
 
 
@@ -187,4 +221,4 @@ def logout():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=65745)
+    app.run(debug=True, port=24736)

@@ -49,7 +49,7 @@ def create_music_table():
 def load_data_to_table():
     try:
         # Open the JSON file
-        with open("2025a1.json") as json_file:
+        with open("data/2025a1.json") as json_file:
             data = json.load(json_file)
 
         # Insert data into DynamoDB
