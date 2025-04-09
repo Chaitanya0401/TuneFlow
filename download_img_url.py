@@ -37,7 +37,7 @@ def download_and_upload_images(bucket_name, json_file):
                 print(f"Error uploading {image_name} to S3: {e}")
 
 # Example Usage
-bucket_name = 's4016331-ass1'  # Replace with your bucket name
+bucket_name = 's4011341-ass1'  # Replace with your bucket name
 json_file = '2025a1.json'  # Replace with the path to your JSON file containing song image URLs
 
 # Download and upload the images to the S3 bucket

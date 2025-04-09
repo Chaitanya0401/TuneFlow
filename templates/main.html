@@ -6,16 +6,15 @@
 
     <div class="subscription-area">
         <h3>Your Subscribed Songs</h3>
-        {% if subscriptions %}
+        {% if subscribed_music %}
             <ul>
-                {% for song in subscriptions %}
+                {% for song in subscribed_music %}
                     <li>
-                        <!-- You can add an image if available, like so -->
-                        <img src="{{ song.image_url }}" alt="Artist Image">  <!-- Make sure you have this attribute in your DynamoDB table -->
+                        <img src="{{ song.image_url }}" alt="Artist Image">
                         <p><strong>{{ song.title }}</strong> by {{ song.artist }}</p>
                         <p>Album: {{ song.album }} ({{ song.year }})</p>
-                        <form action="{{ url_for('unsubscribe', title=song.title) }}" method="POST">
-                            <input type="hidden" name="song_id" value="{{ song.title }}">
+                        <form action="{{ url_for('unsubscribe') }}" method="POST">
+                            <input type="hidden" name="subscription_id" value="{{ song.subscription_id }}">
                             <button type="submit" class="remove-btn">Remove</button>
                         </form>
                     </li>
@@ -24,6 +23,7 @@
         {% else %}
             <p>No subscriptions yet.</p>
         {% endif %}
+
     </div>
 
     <div class="query-area">
@@ -45,7 +45,7 @@
                         <img src="{{ song.image_url }}" alt="Artist Image">
                         <p><strong>{{ song.title }}</strong> by {{ song.artist }}</p>
                         <p>Album: {{ song.album }} ({{ song.year }})</p>
-                        <form action="{{ url_for('subscribe', title=song.title) }}" method="POST">
+                        <form action="{{ url_for('subscribe', title=song.title, artist=song.artist) }}" method="POST">
                             <button type="submit" class="subscribe-btn">Subscribe</button>
                         </form>
                     </li>

@@ -29,7 +29,7 @@ def create_s3_bucket(bucket_name, region='us-east-1'):
         print(f"Error: {e}")
 
 # Replace these with your desired bucket name
-bucket_name = 's4016331-ass1'  # Replace with your own unique bucket name
+bucket_name = 's4011341-ass1'  # Replace with your own unique bucket name
 
 # Create the bucket in the default region (us-east-1)
 create_s3_bucket(bucket_name)

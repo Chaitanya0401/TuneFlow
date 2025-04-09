@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 import json
 import boto3
+from boto3.dynamodb.conditions import Attr
+import uuid
 
 app = Flask(__name__)
 app.secret_key = "cc-lab1"
@@ -32,7 +34,7 @@ def login():
 
         if user and user["password"] == password:
             session["email"] = user["email"]
-            session["username"] = user["username"]
+            session["username"] = user["user_name"]
             return redirect(url_for("main_page"))
         else:
             return render_template("login.html", error="Email or password is invalid")
@@ -57,64 +59,78 @@ def register():
     return render_template("register.html")
 
 
+from boto3.dynamodb.conditions import Key
+
 @app.route("/main", methods=["GET"])
 def main_page():
     if "username" not in session or "email" not in session:
         return redirect(url_for("login"))
 
-    # Fetch all music data
+    # Fetch all music data (optional — used for search)
     all_songs = music_table.scan().get("Items", [])
 
-    # Fetch subscriptions
+    # Fetch subscriptions using the email (partition key)
     subs_response = subscriptions_table.query(
-        KeyConditionExpression=boto3.dynamodb.conditions.Key("email").eq(session["email"])
+        KeyConditionExpression=Key("email").eq(session["email"])
     )
     user_subs = subs_response.get("Items", [])
 
-    print(f"User's subscriptions: {user_subs}")  # Debugging line
+    print(f"User's subscriptions: {user_subs}")  # Debugging
 
-    return render_template("main.html", username=session["username"], songs=all_songs, subscriptions=user_subs)
+    return render_template(
+        "main.html",
+        username=session["username"],
+        songs=all_songs,
+        subscribed_music=user_subs  
+    )
 
 
-
-@app.route("/subscribe/<title>", methods=["GET", "POST"])
-def subscribe(title):
+@app.route("/subscribe/<title>/<artist>", methods=["GET", "POST"])
+def subscribe(title, artist):
     if "email" not in session:
         return redirect(url_for("login"))
 
     user_email = session["email"]
-    song = next((s for s in music_db if s["title"] == title), None)
+    song = next((s for s in music_db if s["title"] == title and s["artist"] == artist), None)
 
     if song:
-        # Check if already subscribed
-        response = subscriptions_table.get_item(Key={"email": user_email, "title": title})
-        if "Item" not in response:
+        # Check if already subscribed by querying using the partition key (email) and filtering on title and artist
+        response = subscriptions_table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("email").eq(user_email),
+            FilterExpression=boto3.dynamodb.conditions.Attr("title").eq(title) & boto3.dynamodb.conditions.Attr("artist").eq(artist)
+        )
+        if not response.get("Items"):  # Only subscribe if not already subscribed
             subscriptions_table.put_item(Item={
+                "subscription_id": str(uuid.uuid4()),
                 "email": user_email,
                 "title": title,
-                "artist": song["artist"],
+                "artist": artist,
                 "album": song["album"],
-                "year": song["year"]
+                "year": song["year"],
+                "image_url": song.get("image_url", "")
             })
-            print(f"Subscription added for {user_email} to song: {title}")  # Debugging line
+            print(f"Subscription added for {user_email} to song: {title} by {artist}")  # Debugging line
 
     return redirect(url_for("main_page"))
 
 
-@app.route("/remove/<title>", methods=["POST"])
-def unsubscribe(title):
+
+@app.route("/unsubscribe", methods=["POST"])
+def unsubscribe():
     if "email" not in session:
         return redirect(url_for("login"))
 
-    user_email = session["email"]
-    
-    # Delete the subscription item from DynamoDB
-    subscriptions_table.delete_item(Key={
-        "email": user_email,
-        "title": title
-    })
+    subscription_id = request.form.get("subscription_id")
+    if subscription_id:
+        subscriptions_table.delete_item(
+            Key={
+                "email": session["email"],
+                "subscription_id": subscription_id
+            }
+        )
 
     return redirect(url_for("main_page"))
+
 
 
 
