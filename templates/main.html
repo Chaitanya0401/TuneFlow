@@ -6,14 +6,15 @@
 
     <div class="subscription-area">
         <h3>Your Subscribed Songs</h3>
-        {% if subscribed_music %}
+        {% if subscriptions %}
             <ul>
-                {% for song in subscribed_music %}
+                {% for song in subscriptions %}
                     <li>
-                        <img src="{{ song.image_url }}" alt="Artist Image">
+                        <!-- You can add an image if available, like so -->
+                        <img src="{{ song.image_url }}" alt="Artist Image">  <!-- Make sure you have this attribute in your DynamoDB table -->
                         <p><strong>{{ song.title }}</strong> by {{ song.artist }}</p>
                         <p>Album: {{ song.album }} ({{ song.year }})</p>
-                        <form action="{{ url_for('unsubscribe') }}" method="POST">
+                        <form action="{{ url_for('unsubscribe', title=song.title) }}" method="POST">
                             <input type="hidden" name="song_id" value="{{ song.title }}">
                             <button type="submit" class="remove-btn">Remove</button>
                         </form>
