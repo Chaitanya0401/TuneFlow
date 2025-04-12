@@ -78,7 +78,7 @@ def register():
             return redirect(url_for("login"))
         else:
             error_message = result.get("error", "Registration failed.")
-            return render_template("register.html", error=error_message)
+            return render_template("register.html", error="The email already exists")
 
     # This part is for the initial GET request to load the registration page
     return render_template("register.html")
@@ -157,7 +157,6 @@ def unsubscribe():
 
 
 
-
 @app.route("/query", methods=["POST"])
 def query():
     if "email" not in session:
@@ -167,6 +166,10 @@ def query():
     artist = request.form.get("artist", "").strip()
     yr = request.form.get("year", "").strip()
     album = request.form.get("album", "").strip()
+
+    title = title.title()
+    artist=artist.title()
+    album= album.title()
 
     filter_expression = []
     expression_values = {}
@@ -206,7 +209,7 @@ def query():
         image_filename = song.get("img_url", "").split("/")[-1]
         song["image_url"] = get_s3_image_url(image_filename)
 
-    # ✅ Fetch user's subscribed songs from DynamoDB
+    # Fetch user's subscribed songs from DynamoDB
     user_email = session["email"]
     subscribed_response = subscriptions_table.query(
         KeyConditionExpression=boto3.dynamodb.conditions.Key("email").eq(user_email)
@@ -217,11 +220,20 @@ def query():
     print(f"Subscribed music: {subscribed_music}")  # Debugging line
     print(f"Search results: {search_results}")  # Debugging line
 
+    # Check if search results are empty
+    if not search_results:
+        error_message = "No result is retrieved. Please query again."
+    else:
+        error_message = None
+
     return render_template("main.html",
                            username=session["user_name"],
                            songs=[],  # this might be legacy — ignore or repurpose
                            subscribed_music=subscribed_music,
-                           search_results=search_results)
+                           search_results=search_results,
+                           error_message=error_message)
+
+
 
 
 @app.route("/logout")
@@ -231,4 +243,4 @@ def logout():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=24736)
+    app.run(debug=True, port=5000)

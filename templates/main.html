@@ -23,7 +23,6 @@
         {% else %}
             <p>No subscriptions yet.</p>
         {% endif %}
-
     </div>
 
     <div class="query-area">
@@ -45,9 +44,8 @@
                     <img src="{{ song.image_url }}" alt="Artist Image" style="width: 50px; height: 50px;">
                     <p><strong>{{ song.title }}</strong> by {{ song.artist }}</p>
                     <p>Album: {{ song.album }} ({{ song.year }})</p>
-                
+
                     {% set is_subscribed = subscribed_music | selectattr('title', 'equalto', song.title) | selectattr('artist', 'equalto', song.artist) | list | length > 0 %}
-                
                     {% if is_subscribed %}
                         <button class="subscribed-btn" disabled>✔ Subscribed</button>
                     {% else %}
@@ -59,13 +57,11 @@
                 {% endfor %}
             </ul>
         </div>
+        {% elif error_message %}
+        <div class="error-message">
+            <p>{{ error_message }}</p>
+        </div>
         {% endif %}
     </div>
-
-
-
-
-
-    <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
 </div>
 {% endblock %}
