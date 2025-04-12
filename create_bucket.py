@@ -5,7 +5,7 @@ import os
 from botocore.exceptions import ClientError
 
 # Configuration settings
-bucket_name = 's4019263-ass1'  # Replace with your actual S3 bucket name
+bucket_name = 's4016331-ass1'  # Replace with your actual S3 bucket name
 region = 'us-east-1'
 s3 = boto3.client('s3', region_name=region)
 

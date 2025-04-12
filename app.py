@@ -3,9 +3,15 @@ import json
 import boto3
 from boto3.dynamodb.conditions import Attr
 import uuid
+from boto3.dynamodb.conditions import Key
+import requests
 
 app = Flask(__name__)
 app.secret_key = "cc-lab1"
+
+REGISTER_API = "https://c42e6sotw0.execute-api.us-east-1.amazonaws.com/default/user_register_lambda"
+SUBSCRIBE_API = "https://x437mo9y66.execute-api.us-east-1.amazonaws.com/default/user-subscribe"
+UNSUBSCRIBE_API = "https://okjtivdrkg.execute-api.us-east-1.amazonaws.com/Production-unscubscribe/unsubscribe_music_lambda"
 
 # DynamoDB resources
 dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
@@ -13,7 +19,7 @@ login_table = dynamodb.Table("login")
 music_table = dynamodb.Table("music")
 subscriptions_table = dynamodb.Table("Subscriptions")  # New subscriptions table
 
-S3_BUCKET = "s4019263-ass1"
+S3_BUCKET = "s4016331-ass1"
 
 def get_s3_image_url(filename):
     print(f"https://{S3_BUCKET}.s3.amazonaws.com/{filename}")  # Debugging line
@@ -56,17 +62,28 @@ def register():
         username = request.form["username"]
         password = request.form["password"]
 
-        response = login_table.get_item(Key={"email": email})
-        if "Item" in response:
-            return render_template("register.html", error="The email already exists")
+        payload = {
+            "email": email,
+            "username": username,
+            "password": password
+        }
 
-        login_table.put_item(Item={"email": email, "user_name": username, "password": password})
-        return redirect(url_for("login"))
+        response = requests.post(REGISTER_API, json=payload)
+        result = response.json()
+        print(f"Register API response: {result}")  # Debugging line
+        print(f"Register API status code: {response.status_code}")  # Debugging line
 
+
+        if response.status_code == 200 and result.get("message") == "User registered successfully":
+            return redirect(url_for("login"))
+        else:
+            error_message = result.get("error", "Registration failed.")
+            return render_template("register.html", error=error_message)
+
+    # This part is for the initial GET request to load the registration page
     return render_template("register.html")
 
 
-from boto3.dynamodb.conditions import Key
 
 @app.route("/main", methods=["GET"])
 def main_page():
@@ -97,32 +114,20 @@ def subscribe(title, artist):
     if "email" not in session:
         return redirect(url_for("login"))
 
-    user_email = session["email"]
     song = next((s for s in music_db if s["title"] == title and s["artist"] == artist), None)
 
     if song:
-        # Check if already subscribed by querying using the partition key (email) and filtering on title and artist
-        response = subscriptions_table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("email").eq(user_email),
-            FilterExpression=boto3.dynamodb.conditions.Attr("title").eq(title) & boto3.dynamodb.conditions.Attr("artist").eq(artist)
-        )
+        payload = {
+            "email": session["email"],
+            "title": title,
+            "artist": artist,
+            "album": song["album"],
+            "year": song["year"],
+            "img_url": song["img_url"]
+        }
 
-        if not response.get("Items"):  # Only subscribe if not already subscribed
-            # Generate S3 image URL
-            image_filename = song.get("img_url", "").split("/")[-1]
-            print(f"Image filename: {image_filename}")  # Debugging line
-            image_url = get_s3_image_url(image_filename)
-
-            subscriptions_table.put_item(Item={
-                "subscription_id": str(uuid.uuid4()),
-                "email": user_email,
-                "title": title,
-                "artist": artist,
-                "album": song["album"],
-                "year": song["year"],
-                "image_url": image_url
-            })
-            print(f"Subscription added for {user_email} to song: {title} by {artist}")  # Debugging line
+        response = requests.post(SUBSCRIBE_API, json=payload)
+        print(f"Subscribe API response: {response.text}")  # Debugging
 
     return redirect(url_for("main_page"))
 
@@ -134,13 +139,18 @@ def unsubscribe():
         return redirect(url_for("login"))
 
     subscription_id = request.form.get("subscription_id")
+    print(f"Unsubscribe subscription_id: {subscription_id}")  # Debugging
+
     if subscription_id:
-        subscriptions_table.delete_item(
-            Key={
-                "email": session["email"],
-                "subscription_id": subscription_id
-            }
-        )
+        payload = {
+            "email": session["email"],
+            "subscription_id": subscription_id
+        }
+
+        print(f"Unsubscribe payload: {payload}")  # Debugging
+
+        response = requests.post(UNSUBSCRIBE_API, json=payload)
+        print(f"Unsubscribe API response: {response.text}")  # Debugging
 
     return redirect(url_for("main_page"))
 
